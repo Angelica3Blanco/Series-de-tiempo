@@ -1,0 +1,209 @@
+---
+title: "laboratorio series de tiempo"
+output: html_document
+date: "2023-10-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+1 Librerías
+```{r}
+library(ggfortify)
+library(forecast)
+#library(fpp2)
+library(data.table)
+library(TTR)
+library(xts)
+library(tidyverse)
+library(lubridate)
+library( tsibble )
+library( ggplot2 )
+library( fabletools)
+library(fpp3)
+```
+Datos
+```{r}
+load( "turistas.RData")
+str( turistas )
+head( turistas )
+class( turistas )
+```
+transfornar data a formato correcto
+```{r}
+# Start and end dates
+start_date <- as.Date("2002-01-01")
+end_date <- as.Date("2006-12-01")
+# Create date vector
+date_vector <- seq(from = start_date, to = end_date, by = "month")
+
+#rep( date_vector , each = 2)
+turi = data.frame( mes = yearmonth( date_vector ),
+                   viajes = turistas$internacional / ( turistas$nacional + turistas$internacional  ) )
+                                    
+turi_perc = turi %>% as_tsibble( index = mes )
+turi_perc
+```
+
+
+1. El análisis consiste en separar la serie en datos de entrenamiento (enero de 2002 a diciembre de
+2005) y datos de prueba (2006).
+```{r}
+train = turi_perc[1:48,]
+test = turi_perc[49:60,]
+```
+2. Realice un análisis exploratorio y la descomposición clásica más apropiada a la serie e interprete el
+resultado.
+
+Tendendia de Viajes a Cion 
+```{r}
+autoplot(turi_perc, viajes) +
+  labs(y = "Cantidad",
+       title = "Porcentaje de viajes internacionales a Cion")
+
+turi_perc |> gg_season( viajes, period = "year") +
+  labs(y="%", title="Porcentaje por mes")
+```
+Con lo visto en el grafico creo que la descomposicion multiplicativa es adecuada debido a que la magnitud de la variacion  cambia  a lo largo del dominio
+```{r}
+multiplicativo = turi_perc %>% model( classical_decomposition( viajes, type = "multiplicative") )
+
+multiplicativo %>% components() %>% autoplot(  ) + labs( title = "Pordentaje de viajes internacionales para el modelo multiplicativo")
+```
+
+3.
+Ajuste un modelo de regresión con tendencia y estacionalidad. Verifique y comente los supuestosde este modelo.
+```{r}
+
+lineal = train %>% model( lineal_simple = TSLM( viajes ~ trend( ) )
+                         ,lineal_dummy  = TSLM( viajes ~ trend( ) + season( ) )
+                         ,cuadratico    = TSLM( viajes ~ trend( ) + I(trend( )^2) )   
+                         ,log_lineal_simple = TSLM( log(viajes) ~ trend( ) )
+                         ,log_lineal_dummy  = TSLM( log(viajes) ~ trend( ) + season( ) )
+                         ,log_cuadratico    = TSLM( log(viajes) ~ trend( ) + I(trend( )^2) )     
+)
+lineal %>% glance()
+```
+Obtengo mejor R2 y AIC para modelos con dummy seasonal (log_lineal_simple y log_cuadratico producen mejor AIC pero R2 muy bajos por lo que tienen gran variabilidad)
+```{r}
+lineal = train %>% model(  lineal_dummy  = TSLM( viajes ~ trend( ) + season( ) )
+                          ,log_lineal_dummy  = TSLM( log(viajes) ~ trend( ) + season( ) )
+)
+lineal %>% glance()
+
+lineal = train %>% model( log_lineal_dummy  = TSLM( log(viajes) ~ trend( ) + season( ) )
+)
+lineal %>% glance()
+lineal %>% coef()
+
+```
+Mejor resultado se obtiene log_lineal_dummy con un R2 similar pero una gran mejora en AIC.
+
+CHECK SUPUESTOS
+
+```{r}
+residuales = lineal %>% residuals() %>% select( .resid )
+shapiro.test( residuales$.resid )
+hist( residuales$.resid )
+```
+No hay normalidad, casi de fijo no hay homocedasticidad
+Sin embargo del grafico se obserca que hay pocos valores extremos menores -0.1
+```{r}
+residuales %>% filter( .resid < -0.1)
+residuales_sin_valores_extremos = residuales %>% filter( .resid >= -0.1)
+shapiro.test( residuales_sin_valores_extremos$.resid )
+hist( residuales_sin_valores_extremos$.resid )
+```
+Son 3 valores (2003 abril a junio), al quitarlos el modelo cumple con normalidad.
+```{r}
+mes = factor( rep(1:12, each = 4) )
+tiempo = 1:48
+lm_clasico = data.frame( mes, tiempo, log_tem = log( train$viajes ) )
+lm = lm( log_tem ~ tiempo + mes, data = lm_clasico[ -c(16:18), ] ) 
+#lm$residuals < -0.2
+lmtest::bptest( lm )
+plot( lm$residuals, lm$fitted.values )
+```
+Auto correlación 
+```{r}
+lineal %>% gg_tsresiduals()
+lineal = train %>% model( log_lineal_dummy  = TSLM( log(viajes) ~ trend( ) + season( ) ) )
+lineal %>%  augment() %>%  ACF(.innov) %>%  autoplot() + labs(title = "")
+lineal %>%  augment() %>% features(.innov, ljung_box, lag = 1)
+```
+**FALTA VER AUTOCORRELACION**
+
+
+
+
+
+4.Ajuste un modelo de suavizamiento exponencial apropiado para la serie Zt Comente el resultado.
+```{r}
+suavizamiento_exponencial = train %>% model( ses = ETS( viajes ~ error("A") + trend("N") + season("N") ) 
+                                           , holts = ETS( viajes ~ error("A") + trend("A") + season("N") )
+                                           , aditivo = ETS( viajes ~ error("A") + trend("A") + season("A") )    
+                                           , multiplicativo = ETS( viajes ~ error("M") + trend("A") + season("M") )
+                                            )
+suavizamiento_exponencial %>% glance()
+
+suavizamiento_exponencial = train %>% model( holts = ETS( viajes ~ error("A") + trend("A") + season("N") ) )
+suavizamiento_exponencial %>% coef()
+```
+Escojo modelo de Holts porque minimiza AIC y AICc
+
+```{r}
+suavizamiento_exponencial = train %>% model( ses = ETS( viajes ~ error("A") + trend("N") + season("N") ) 
+                                           , holts = ETS( viajes ~ error("A") + trend("A") + season("N") )
+                                           , aditivo = ETS( viajes ~ error("A") + trend("A") + season("A") )    
+                                           , multiplicativo = ETS( viajes ~ error("M") + trend("A") + season("M") )
+                                            )
+suavizamiento_exponencial %>% glance()
+
+suavizamiento_exponencial = train %>% model( holts = ETS( viajes ~ error("A") + trend("A") + season("N") ) )
+suavizamiento_exponencial %>% glance()
+```
+Mismo patrón, AICc se reduce con Holt.
+
+```{r}
+suavizamiento_exponencial %>%  augment() %>%  ACF(.innov) %>%  autoplot() + labs(title = "")
+suavizamiento_exponencial %>%  augment() %>% features(.innov, ljung_box, lag = 7)
+```
+
+
+5) 
+Pronostique la proporción de turistas internacionales en el año 2006 usando la regresión del (3) yel modelo de suavizamiento exponencial de (4). ¿Cuál técnica produce mejor resultado?
+
+Metricas del modelo (3)
+```{r}
+suavizamiento_exponencial = train %>% model( holts = ETS( viajes ~ error("A") + trend("A") + season("N") ) )
+forecasted_suavizamiento = suavizamiento_exponencial %>% forecast( h = 12 )
+forecasted_suavizamiento 
+accuracy( forecasted_suavizamiento, turi_perc )
+```
+```{r}
+lineal = train %>% model( lineal  = TSLM( log(viajes) ~ trend( ) + season( ) ) )
+forecasted_lineal = lineal %>% forecast( h = 12 )
+forecasted_lineal 
+accuracy( forecasted_lineal, turi_perc )
+```
+grafico de nuestras estimaciones
+```{r}
+forecasted_suavizamiento_2 = suavizamiento_exponencial %>% forecast( test )
+forecasted_lineal_2 = lineal %>% forecast( test )
+base = bind_rows(test, forecasted_lineal, forecasted_suavizamiento )
+#forecasted
+base |>
+  autoplot() + #bind_rows(google_2015, google_jan_2016), level = NULL
+  labs(y = "$US",
+       title = "Google closing stock prices from Jan 2015") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+estimacion = rbind( forecasted_suavizamiento_2, forecasted_lineal_2)
+
+estimacion %>% autoplot(turi_perc, level = NULL)+ guides(colour = guide_legend(title = "Forecast"), labels = c("Holts", "Modelo lineal")) 
+
+```
+
+Las metricas del modelo lineal muestran un modelo mas preciso.
+
+Conclusiones: modelo savizamiento mejor para modelar la media de nuestros datos ya que pese a que el modelo lineal goza de mejores metricas de precision sus errores estan altamente correlacionados al estar correlacionados con el error anterior *et-1 y et-2*. Se aconseja expandir el analisis tomando en cuenta otras metodologías como modelos arima o modelos dinamicos, ademas de alternativas en machine learning con la intencion de mejorar la precision de nuestras estimaciones y evitar autocorrelacion de nuestros errores.
