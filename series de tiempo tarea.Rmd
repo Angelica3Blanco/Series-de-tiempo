@@ -131,11 +131,6 @@ lineal = train %>% model( log_lineal_dummy  = TSLM( log(viajes) ~ trend( ) + sea
 lineal %>%  augment() %>%  ACF(.innov) %>%  autoplot() + labs(title = "")
 lineal %>%  augment() %>% features(.innov, ljung_box, lag = 1)
 ```
-**FALTA VER AUTOCORRELACION**
-
-
-
-
 
 4.Ajuste un modelo de suavizamiento exponencial apropiado para la serie Zt Comente el resultado.
 ```{r}
