@@ -1,0 +1,486 @@
+---
+title: "Estudio de dimensionalidad de los datos"
+author: "Angelica"
+date: "2023-11-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{r}
+#install.packages("polycor")
+library(polycor)
+```
+## Analisis para estudiar la dimesionalidad de motivacion 
+
+```{r}
+
+library("readxl") 
+Analisis_multivariado_pract <- read_excel("Analisis multivariado pract.xlsx",  sheet = "mot")
+
+Analisis_multivariado_pract$Q28_16=6-as.numeric(Analisis_multivariado_pract$Q28_16)
+Analisis_multivariado_pract$Q28_17=6-as.numeric(Analisis_multivariado_pract$Q28_17)
+Analisis_multivariado_pract$Q28_18=6-as.numeric(Analisis_multivariado_pract$Q28_18)
+data1 <- Analisis_multivariado_pract
+
+```
+
+```{r}
+nuevabase=data1
+data1 <- apply(nuevabase,2, as.numeric)
+
+nuevabase <- apply(nuevabase,2, as.factor)
+
+```
+
+```{r}
+cor.bas = polycor::hetcor(nuevabase, ML=FALSE)
+```
+
+Pruebas
+
+```{r}
+#install.packages("psych")
+library(psych)
+```
+```{r}
+
+KMO(cor.bas$correlations)
+
+```
+```{r}
+cortest.bartlett(cor.bas$correlations, n=204)
+```
+
+Autovalores
+```{r}
+ev1 = eigen(cor.bas$correlations)
+```
+Radio 
+```{r}
+r = ev1$values[1]/ev1$values[2]
+round(r,4)
+```
+Factor de aceleración
+
+```{r}
+ev1 = eigen(cor.bas$correlations)
+
+(a3 = ev1$values[3] - ev1$values[2] - (ev1$values[2] - ev1$values[1]))
+a4 = ev1$values[4] - ev1$values[3] - (ev1$values[3] - ev1$values[2])
+a5 = ev1$values[5] - ev1$values[4] - (ev1$values[4] - ev1$values[3])
+a3
+a4
+a5
+```
+Screeplot
+
+library(nFactors)
+library(lattice)
+
+```{r}
+
+
+ap1 <- fa.parallel(cor.bas$correlations, n.obs = 1015 )
+```
+```{r}
+library(nFactors)
+nS1 <- nScree(x=eigen(cor.bas$correlations)$values, aparallel=ap1$eigen$qevpea)
+
+plotnScree(nS1)
+```
+
+
+
+
+
+
+Modelos 
+
+```{r}
+f.solucion1 = fa(cor.bas$correlations, nfactors = 1, rotate = "none", fm = "pa")
+f.solucion1
+```
+
+
+install.packages("semTools")
+library(semTools)
+
+
+
+```{r}
+print(f.solucion1$loadings, cutoff=0.1)
+```
+
+
+```{r}
+f.solucion2 = fa(cor.bas$correlations, nfactors = 2, rotate = "none", fm = "pa")
+f.solucion2
+```
+
+
+```{r}
+print(f.solucion2$loadings, cutoff=0.1)
+```
+
+```{r}
+fa.diagram(f.solucion1, main="Diagrama de la estructura")
+```
+
+
+```{r}
+fa.diagram(f.solucion2, main="Diagrama de la estructura")
+```
+
+
+```{r}
+ajuste= fa(data1, nfactors=1, rotate="none", fm="wls")
+
+ajuste$RMSEA
+```
+
+```{r}
+ajuste2= fa(data1, nfactors=2, rotate="none", fm="wls")
+
+ajuste2$RMSEA
+```
+ TCT 
+
+```{r}
+suppressWarnings(installed.packages("CTT"))
+library(CTT)
+```
+
+
+```{r}
+ai = itemAnalysis(data1)
+```
+
+
+```{r}
+ai$itemReport
+```
+
+```{r}
+itemAnalysis(nuevabase)
+```
+```{r}
+mean(ai$itemReport$itemMean)
+```
+
+
+
+
+## Estudio de la dimension de satifacion 
+
+```{r}
+library("readxl") 
+Analisis_multivariado_pract <- read_excel("Analisis multivariado pract.xlsx",  sheet = "sat")
+data1 <- Analisis_multivariado_pract
+nuevabase=data1
+```
+
+```{r}
+
+nuevabase <- apply(nuevabase,2, as.factor)
+```
+
+```{r}
+cor.bas = polycor::hetcor(nuevabase, ML=FALSE)
+```
+
+Pruebas
+
+```{r}
+#install.packages("psych")
+library(psych)
+```
+```{r}
+
+KMO(cor.bas$correlations)
+
+```
+```{r}
+cortest.bartlett(cor.bas$correlations, n=204)
+```
+
+Autovalores
+```{r}
+ev1 = eigen(cor.bas$correlations)
+```
+Radio 
+```{r}
+r = ev1$values[1]/ev1$values[2]
+round(r,4)
+```
+Factor de aceleración
+
+```{r}
+ev1 = eigen(cor.bas$correlations)
+
+(a3 = ev1$values[3] - ev1$values[2] - (ev1$values[2] - ev1$values[1]))
+a4 = ev1$values[4] - ev1$values[3] - (ev1$values[3] - ev1$values[2])
+a5 = ev1$values[5] - ev1$values[4] - (ev1$values[4] - ev1$values[3])
+a3
+a4
+a5
+```
+Screeplot
+
+library(nFactors)
+library(lattice)
+
+```{r}
+
+
+ap1 <- fa.parallel(cor.bas$correlations, n.obs = 1015 )
+```
+```{r}
+library(nFactors)
+nS1 <- nScree(x=eigen(cor.bas$correlations)$values, aparallel=ap1$eigen$qevpea)
+
+plotnScree(nS1)
+```
+
+
+
+
+
+
+Modelos 
+
+```{r}
+f.solucion1 = fa(cor.bas$correlations, nfactors = 1, rotate = "none", fm = "pa")
+f.solucion1
+```
+
+
+install.packages("semTools")
+library(semTools)
+
+
+
+```{r}
+print(f.solucion1$loadings, cutoff=0.1)
+```
+
+
+```{r}
+f.solucion2 = fa(cor.bas$correlations, nfactors = 2, rotate = "none", fm = "pa")
+f.solucion2
+```
+
+
+```{r}
+print(f.solucion2$loadings, cutoff=0.1)
+```
+
+```{r}
+fa.diagram(f.solucion1, main="Diagrama de la estructura")
+```
+
+
+```{r}
+fa.diagram(f.solucion2, main="Diagrama de la estructura")
+```
+
+
+```{r}
+data1 <- apply(nuevabase,2, as.numeric)
+ajuste= fa(data1, nfactors=1, rotate="none", fm="wls")
+
+ajuste$RMSEA
+```
+
+```{r}
+ajuste2= fa(data1, nfactors=2, rotate="none", fm="wls")
+
+ajuste2$RMSEA
+```
+ TCT 
+
+```{r}
+suppressWarnings(installed.packages("CTT"))
+library(CTT)
+```
+
+
+```{r}
+ai = itemAnalysis(nuevabase)
+```
+
+
+```{r}
+ai$itemReport
+```
+
+```{r}
+itemAnalysis(nuevabase)
+```
+```{r}
+mean(ai$itemReport$itemMean)
+```
+
+
+
+## Estudio de la dimensio de procastinacion 
+
+```{r}
+library("readxl") 
+Analisis_multivariado_pract <- read_excel("Analisis multivariado pract.xlsx",  sheet = "proc")
+data1 <- Analisis_multivariado_pract
+nuevabase=data1
+```
+
+```{r}
+data1 <- apply(nuevabase,2, as.numeric)
+nuevabase <- apply(nuevabase,2, as.factor)
+```
+
+```{r}
+cor.bas = polycor::hetcor(nuevabase, ML=FALSE)
+```
+
+Pruebas
+
+```{r}
+#install.packages("psych")
+library(psych)
+```
+```{r}
+
+KMO(cor.bas$correlations)
+
+```
+```{r}
+cortest.bartlett(cor.bas$correlations, n=204)
+```
+
+Autovalores
+```{r}
+ev1 = eigen(cor.bas$correlations)
+```
+Radio 
+```{r}
+r = ev1$values[1]/ev1$values[2]
+round(r,4)
+```
+Factor de aceleración
+
+```{r}
+ev1 = eigen(cor.bas$correlations)
+
+(a3 = ev1$values[3] - ev1$values[2] - (ev1$values[2] - ev1$values[1]))
+a4 = ev1$values[4] - ev1$values[3] - (ev1$values[3] - ev1$values[2])
+a5 = ev1$values[5] - ev1$values[4] - (ev1$values[4] - ev1$values[3])
+a3
+a4
+a5
+```
+Screeplot
+
+library(nFactors)
+library(lattice)
+
+```{r}
+
+
+ap1 <- fa.parallel(cor.bas$correlations, n.obs = 1015 )
+```
+```{r}
+library(nFactors)
+nS1 <- nScree(x=eigen(cor.bas$correlations)$values, aparallel=ap1$eigen$qevpea)
+
+plotnScree(nS1)
+```
+
+
+
+
+
+
+Modelos 
+
+```{r}
+f.solucion1 = fa(cor.bas$correlations, nfactors = 1, rotate = "none", fm = "pa")
+f.solucion1
+```
+
+
+install.packages("semTools")
+library(semTools)
+
+
+
+```{r}
+print(f.solucion1$loadings, cutoff=0.1)
+```
+
+
+```{r}
+f.solucion2 = fa(cor.bas$correlations, nfactors = 2, rotate = "none", fm = "pa")
+f.solucion2
+```
+
+
+```{r}
+print(f.solucion2$loadings, cutoff=0.1)
+```
+
+```{r}
+fa.diagram(f.solucion1, main="Diagrama de la estructura")
+```
+
+
+```{r}
+fa.diagram(f.solucion2, main="Diagrama de la estructura")
+```
+
+
+```{r}
+ajuste= fa(data1, nfactors=1, rotate="none", fm="wls")
+
+ajuste$RMSEA
+```
+
+```{r}
+ajuste2= fa(data1, nfactors=2, rotate="none", fm="wls")
+
+ajuste2$RMSEA
+```
+ TCT 
+
+```{r}
+suppressWarnings(installed.packages("CTT"))
+library(CTT)
+```
+
+
+```{r}
+ai = itemAnalysis(nuevabase)
+```
+
+
+```{r}
+ai$itemReport
+```
+
+```{r}
+itemAnalysis(nuevabase)
+```
+```{r}
+mean(ai$itemReport$itemMean)
+```
+
+
+
+
